@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Вести Иркутск — Мини-приложение</title>
+<link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=PT+Sans+Caption:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #f0f2f5; color: #1a1a1a; font-family: 'PT Sans', -apple-system, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; display: flex; justify-content: center; }
+  ::-webkit-scrollbar { width: 0; }
+  .app { max-width: 430px; width: 100%; min-height: 100vh; background: #f0f2f5; position: relative; overflow: hidden; }
+  .header { background: #00AEEF; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; }
+  .header-logo { font-size: 16px; font-weight: 700; color: #fff; font-family: 'PT Sans Caption', 'PT Sans', sans-serif; }
+  .header-logo span { opacity: 0.85; }
+  .header-live { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #fff; font-weight: 700; opacity: 0.9; }
+  .live-dot { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 8px; height: 8px; margin-right: 4px; }
+  .live-dot-ping { position: absolute; width: 8px; height: 8px; border-radius: 50%; animation: pulse 2s ease-in-out infinite; }
+  .live-dot-core { width: 4px; height: 4px; border-radius: 50%; position: relative; z-index: 1; }
+  .tab-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; z-index: 100; }
+  .tab-bar-inner { display: flex; justify-content: space-around; align-items: center; padding: 8px 8px 24px; background: #fff; border-top: 1px solid #e5e7eb; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
+  .tab-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; background: none; border: none; cursor: pointer; color: #9ca3af; transition: all 0.2s; padding: 4px 20px; font-family: inherit; position: relative; }
+  .tab-btn.active { color: #00AEEF; }
+  .tab-btn .tab-indicator { position: absolute; top: -9px; width: 28px; height: 3px; background: #00AEEF; border-radius: 0 0 2px 2px; display: none; }
+  .tab-btn.active .tab-indicator { display: block; }
+  .tab-btn .tab-icon { font-size: 20px; transition: transform 0.2s; }
+  .tab-btn.active .tab-icon { transform: scale(1.1); }
+  .tab-btn .tab-label { font-size: 10px; font-weight: 500; }
+  .tab-btn.active .tab-label { font-weight: 700; }
+  .tab-content { padding: 0 12px 110px; overflow-y: auto; height: calc(100vh - 42px); animation: fadeIn 0.2s ease; }
+  .tab-content[hidden] { display: none; }
+  .section-header { padding: 16px 0 12px; animation: fadeUp 0.4s ease; }
+  .section-label { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+  .section-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .section-desc { font-size: 13px; color: #6b7280; line-height: 1.5; }
+  .card { background: #fff; border-radius: 10px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04); }
+  .badge { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.01em; }
+  .btn-primary { width: 100%; padding: 13px; border-radius: 8px; border: none; background: #00AEEF; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; box-shadow: 0 2px 8px rgba(0,174,239,0.3); transition: background 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-primary:hover { background: #0095d0; }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; background: #00AEEF; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+  .like-btn { background: none; border: none; cursor: pointer; font-size: 13px; font-family: inherit; display: flex; align-items: center; gap: 4px; transition: color 0.2s; color: #9ca3af; }
+  .like-btn.liked { color: #e53935; }
+  .promo { margin-top: 16px; padding: 14px; border-radius: 10px; background: #00AEEF; color: #fff; text-align: center; box-shadow: 0 4px 16px rgba(0,174,239,0.3); }
+  .promo h4 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .promo p { font-size: 12px; opacity: 0.85; margin-bottom: 10px; }
+  .promo button { padding: 8px 20px; border-radius: 6px; border: 2px solid #fff; background: transparent; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .quiz-option { padding: 12px 14px; border-radius: 8px; border: 1px solid #e5e7eb; border-left: 3px solid transparent; background: #fff; color: #1a1a1a; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 10px; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.06); width: 100%; }
+  .quiz-option:hover:not(.answered) { background: #f7f8fa; }
+  .quiz-option.correct { background: rgba(46,125,50,0.08); border-color: #2e7d32; border-left-color: #2e7d32; animation: popIn 0.3s ease; }
+  .quiz-option.wrong { background: rgba(229,57,53,0.08); border-color: #e53935; border-left-color: #e53935; animation: popIn 0.3s ease; }
+  .quiz-option.dimmed { color: #9ca3af; }
+  .quiz-option.answered { cursor: default; box-shadow: none; }
+  .option-marker { width: 26px; height: 26px; border-radius: 6px; background: #f0f2f5; color: #6b7280; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; transition: all 0.2s; }
+  .correct .option-marker { background: #2e7d32; color: #fff; }
+  .wrong .option-marker { background: #e53935; color: #fff; }
+  .explanation { margin-top: 12px; padding: 14px; border-radius: 8px; background: #e6f7ff; animation: fadeUp 0.3s ease; }
+  .explanation-label { font-size: 11px; font-weight: 700; color: #00AEEF; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .explanation p { font-size: 13px; line-height: 1.55; color: #6b7280; }
+  .progress-bar { display: flex; gap: 4px; margin-bottom: 4px; }
+  .progress-segment { flex: 1; height: 4px; border-radius: 2px; background: #e5e7eb; transition: background 0.3s; }
+  .progress-segment.done { background: #2e7d32; }
+  .progress-segment.current { background: #00AEEF; }
+  .results-card { margin-top: 32px; text-align: center; animation: popIn 0.5s ease; background: #fff; border-radius: 12px; padding: 32px 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+  .results-emoji { font-size: 56px; margin-bottom: 12px; }
+  .results-score { font-size: 44px; font-weight: 700; margin-bottom: 4px; font-family: 'PT Sans Caption', sans-serif; }
+  .results-bar-track { width: 70%; margin: 0 auto 24px; height: 6px; border-radius: 3px; background: #f0f2f5; overflow: hidden; }
+  .results-bar-fill { height: 100%; border-radius: 3px; animation: slideRight 0.8s ease; }
+  .share-box { margin-top: 20px; padding: 14px; border-radius: 8px; background: #e6f7ff; text-align: center; }
+  .form-textarea { width: 100%; height: 72px; background: #f0f2f5; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; color: #1a1a1a; font-size: 14px; resize: none; font-family: inherit; outline: none; }
+  .form-btn { flex: 1; padding: 9px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; color: #6b7280; font-size: 13px; cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .filter-pills { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 10px; -webkit-overflow-scrolling: touch; }
+  .filter-pill { padding: 5px 12px; border-radius: 6px; white-space: nowrap; border: 1px solid #e5e7eb; background: #fff; color: #6b7280; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+  .filter-pill.active { border: none; color: #fff; }
+  #leafletMap { width: 100%; height: 280px; border-radius: 10px; overflow: hidden; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); z-index: 1; }
+  .event-item { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 8px; text-align: left; background: #fff; border: 1px solid #e5e7eb; border-left: 3px solid transparent; cursor: pointer; font-family: inherit; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.06); width: 100%; }
+  .event-item.selected { box-shadow: none; }
+  .event-item .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.6); opacity: 0.3; } }
+  @keyframes slideRight { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+  @keyframes popIn { 0% { transform: scale(0.85); opacity: 0; } 60% { transform: scale(1.03); } 100% { transform: scale(1); opacity: 1; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="header-logo">ВЕСТИ<span>ИРКУТСК</span></div>
+    <div class="header-live">
+      <span class="live-dot"><span class="live-dot-ping" style="background:#fff"></span><span class="live-dot-core" style="background:#fff"></span></span>
+      LIVE
+    </div>
+  </div>
+
+  <!-- Witness -->
+  <div class="tab-content" id="tab-witness">
+    <div class="section-header">
+      <div class="section-label" style="color:#e53935">
+        <span class="live-dot"><span class="live-dot-ping" style="background:#e53935"></span><span class="live-dot-core" style="background:#e53935"></span></span>
+        Прямой эфир
+      </div>
+      <h2 class="section-title">Свидетель</h2>
+      <p class="section-desc">Сообщите о событии — лучшие материалы попадут в эфир</p>
+    </div>
+    <button class="btn-primary" onclick="toggleForm()" id="formToggleBtn">📸 Сообщить новость</button>
+    <div id="reportForm" style="display:none; margin-top:16px; margin-bottom:16px; animation: fadeUp 0.3s ease">
+      <div class="card" id="formContent">
+        <textarea class="form-textarea" placeholder="Опишите, что происходит..."></textarea>
+        <div style="display:flex; gap:8px; margin-top:8px">
+          <button class="form-btn">📷 Фото</button>
+          <button class="form-btn">📍 Геолокация</button>
+        </div>
+        <button class="btn-primary" style="margin-top:8px" onclick="submitReport()">Отправить в редакцию</button>
+      </div>
+    </div>
+    <div id="reportsList" style="display:flex; flex-direction:column; gap:10px; margin-top:16px"></div>
+    <div class="promo" style="animation: fadeUp 0.5s ease 0.3s both">
+      <h4>📺 Смотрите в вечернем выпуске</h4>
+      <p>Лучшие репортажи «свидетелей» — сегодня в 21:00</p>
+      <button>Подписаться на канал</button>
+    </div>
+  </div>
+
+  <!-- Quiz -->
+  <div class="tab-content" id="tab-quiz" hidden><div id="quizBody"></div></div>
+
+  <!-- Map -->
+  <div class="tab-content" id="tab-map" hidden>
+    <div class="section-header">
+      <div class="section-label" style="color:#00AEEF">
+        <span class="live-dot"><span class="live-dot-ping" style="background:#00AEEF"></span><span class="live-dot-core" style="background:#00AEEF"></span></span>
+        Иркутская область
+      </div>
+      <h2 class="section-title">Карта событий</h2>
+      <p class="section-desc">Что происходит в регионе прямо сейчас</p>
+    </div>
+    <div class="filter-pills" id="mapFilters"></div>
+    <div id="leafletMap"></div>
+    <div id="eventsList" style="display:flex; flex-direction:column; gap:6px"></div>
+    <div class="promo" style="margin-top:16px; animation: fadeUp 0.5s ease 0.3s both">
+      <h4>🗺 Следите за событиями региона</h4>
+      <p>Все новости Иркутской области — в нашем телеграм-канале</p>
+      <button>Подписаться</button>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-bar-inner">
+      <button class="tab-btn active" data-tab="witness" onclick="switchTab('witness')"><div class="tab-indicator"></div><span class="tab-icon">📸</span><span class="tab-label">Свидетель</span></button>
+      <button class="tab-btn" data-tab="quiz" onclick="switchTab('quiz')"><div class="tab-indicator"></div><span class="tab-icon">🧠</span><span class="tab-label">Викторина</span></button>
+      <button class="tab-btn" data-tab="map" onclick="switchTab('map')"><div class="tab-indicator"></div><span class="tab-icon">🗺</span><span class="tab-label">Карта</span></button>
+    </div>
+  </div>
+</div>
+
+<script>
+const REPORTS = [
+  { id:1, author:"Алексей М.", city:"Иркутск", time:"12 мин назад", text:"На пересечении ул. Байкальской и Лермонтова крупная авария, движение затруднено. На месте работают экстренные службы.", likes:47, status:"На проверке", category:"Происшествия" },
+  { id:2, author:"Мария К.", city:"Иркутск", time:"34 мин назад", text:"На набережной Ангары начался фестиваль ледяных скульптур — очень красиво, собралось уже больше 300 человек!", likes:132, status:"В эфире", category:"Общество" },
+  { id:3, author:"Дмитрий В.", city:"Ангарск", time:"1 ч назад", text:"Открылся новый спортивный комплекс на ул. Карла Маркса. Очереди на запись — жители фотографируются у входа.", likes:89, status:"На проверке", category:"Город" },
+  { id:4, author:"Елена С.", city:"Братск", time:"2 ч назад", text:"Температура упала до -38°C, школы переведены на дистанционное обучение. МЧС рекомендует не выходить из дома без необходимости.", likes:215, status:"В эфире", category:"Погода" },
+];
+
+const QUESTIONS = [
+  { q:"Сколько ледовых переправ планируют закрыть в Иркутской области этой весной?", opts:["10","18","25","32"], correct:1, expl:"По данным регионального МЧС, в этом сезоне планируется закрытие 18 ледовых переправ." },
+  { q:"Какой клуб представляет Иркутск в Суперлиге России по футзалу?", opts:["Байкал","ИрАэро","Ангара","Сибиряк"], correct:1, expl:"ФК «ИрАэро» представляет Иркутск в Суперлиге России по футзалу." },
+  { q:"В каком году вышел первый эфир «Вести Иркутск»?", opts:["1958","1975","1991","2002"], correct:0, expl:"Первый выпуск новостей на иркутском телевидении вышел ещё в 1958 году." },
+  { q:"В каком посёлке запустили новый цех мясных консервов?", opts:["Листвянка","Усть-Ордынский","Байкальск","Слюдянка"], correct:1, expl:"Новый цех по производству мясных консервов открылся в посёлке Усть-Ордынский." },
+  { q:"Какой региональный бал прошёл в Иркутске в конце февраля 2026?", opts:["Губернаторский","Кадетский","Студенческий","Благотворительный"], correct:1, expl:"Третий региональный кадетский бал прошёл в Иркутске 27 февраля 2026 года." },
+];
+
+const MAP_EVENTS = [
+  { id:1, title:"ДТП на Байкальской", city:"Иркутск", cat:"Происшествия", time:"12 мин назад", lat:52.286, lng:104.305, hot:true },
+  { id:2, title:"Фестиваль на набережной", city:"Иркутск", cat:"Общество", time:"34 мин назад", lat:52.291, lng:104.281, hot:false },
+  { id:3, title:"Новый спорткомплекс", city:"Ангарск", cat:"Город", time:"1 ч назад", lat:52.543, lng:103.888, hot:false },
+  { id:4, title:"Аномальный мороз", city:"Братск", cat:"Погода", time:"2 ч назад", lat:56.132, lng:101.614, hot:true },
+  { id:5, title:"Закрытие переправы", city:"Ольхон", cat:"Транспорт", time:"3 ч назад", lat:53.168, lng:107.394, hot:true },
+  { id:6, title:"Пожар в гаражах", city:"Шелехов", cat:"Происшествия", time:"4 ч назад", lat:52.214, lng:104.101, hot:false },
+  { id:7, title:"Ярмарка выходного дня", city:"Усолье-Сибирское", cat:"Общество", time:"5 ч назад", lat:52.753, lng:103.647, hot:false },
+  { id:8, title:"Прорыв теплотрассы", city:"Тулун", cat:"ЖКХ", time:"30 мин назад", lat:54.562, lng:100.580, hot:true },
+];
+
+const CAT_COLORS = { "Происшествия":"#e53935","Общество":"#00AEEF","Город":"#2e7d32","Погода":"#7c4dff","Транспорт":"#ff6d00","ЖКХ":"#f9a825" };
+
+let liked = {}, reportLikes = {};
+REPORTS.forEach(r => reportLikes[r.id] = r.likes);
+let quizCurrent = 0, quizSelected = null, quizScore = 0, quizStreak = 0, quizFinished = false;
+let mapFilter = "Все", mapSelectedId = null, leafletMap = null, mapMarkers = [], mapInitialized = false;
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.hidden = true);
+  document.getElementById('tab-' + tab).hidden = false;
+  document.querySelectorAll('.tab-btn').forEach(btn => { btn.classList.toggle('active', btn.dataset.tab === tab); });
+  if (tab === 'quiz') renderQuiz();
+  if (tab === 'map') { setTimeout(() => { if (!mapInitialized) initMap(); else leafletMap.invalidateSize(); renderMapFilters(); renderMapMarkers(); renderEventsList(); }, 50); }
+}
+
+function toggleForm() {
+  const form = document.getElementById('reportForm');
+  const btn = document.getElementById('formToggleBtn');
+  if (form.style.display === 'none') {
+    form.style.display = 'block'; btn.innerHTML = '📸 Скрыть форму';
+    document.getElementById('formContent').innerHTML = `<textarea class="form-textarea" placeholder="Опишите, что происходит..."></textarea><div style="display:flex;gap:8px;margin-top:8px"><button class="form-btn">📷 Фото</button><button class="form-btn">📍 Геолокация</button></div><button class="btn-primary" style="margin-top:8px" onclick="submitReport()">Отправить в редакцию</button>`;
+  } else { form.style.display = 'none'; btn.innerHTML = '📸 Сообщить новость'; }
+}
+function submitReport() {
+  document.getElementById('formContent').innerHTML = `<div style="text-align:center;padding:16px 0;animation:popIn 0.4s ease"><div style="font-size:40px;margin-bottom:8px">✅</div><div style="font-size:15px;font-weight:700;margin-bottom:4px">Отправлено!</div><div style="font-size:13px;color:#6b7280">Редакция проверит ваш материал</div></div>`;
+}
+function toggleLike(id) { liked[id] = !liked[id]; reportLikes[id] += liked[id] ? 1 : -1; renderReports(); }
+function renderReports() {
+  document.getElementById('reportsList').innerHTML = REPORTS.map((r, i) => {
+    const sc = r.status==="В эфире"?"#e53935":"#f9a825", sb = r.status==="В эфире"?sc:`${sc}14`, st = r.status==="В эфире"?"#fff":sc, cc = CAT_COLORS[r.category]||"#6b7280", il = liked[r.id];
+    return `<div class="card" style="animation:fadeUp 0.4s ease ${i*0.07}s both"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px"><div style="display:flex;align-items:center;gap:10px"><div class="avatar">${r.author[0]}</div><div><div style="font-size:14px;font-weight:700">${r.author}</div><div style="font-size:11px;color:#9ca3af">${r.city} · ${r.time}</div></div></div><span class="badge" style="background:${r.status==="В эфире"?sc:sb};color:${st}">${r.status==="В эфире"?"▶ В эфире":r.status}</span></div><p style="font-size:14px;line-height:1.55;margin-bottom:10px">${r.text}</p><div style="display:flex;justify-content:space-between;align-items:center"><span class="badge" style="background:${cc}14;color:${cc}">${r.category}</span><button class="like-btn ${il?'liked':''}" onclick="toggleLike(${r.id})">${il?'❤️':'🤍'} ${reportLikes[r.id]}</button></div></div>`;
+  }).join('');
+}
+
+function selectAnswer(idx) {
+  if (quizSelected !== null) return; quizSelected = idx;
+  if (idx === QUESTIONS[quizCurrent].correct) { quizScore++; quizStreak++; } else { quizStreak = 0; }
+  renderQuiz();
+}
+function nextQuestion() { if (quizCurrent < QUESTIONS.length-1) { quizCurrent++; quizSelected = null; } else { quizFinished = true; } renderQuiz(); }
+function restartQuiz() { quizCurrent=0; quizSelected=null; quizScore=0; quizStreak=0; quizFinished=false; renderQuiz(); }
+
+function renderQuiz() {
+  const el = document.getElementById('quizBody');
+  const pct = Math.round((quizScore / QUESTIONS.length) * 100);
+  if (quizFinished) {
+    const c = pct>=80?'#2e7d32':pct>=50?'#00AEEF':'#e53935';
+    el.innerHTML = `<div class="results-card"><div class="results-emoji">${pct>=80?'🏆':pct>=50?'👏':'📚'}</div><h2 style="font-size:24px;font-weight:700;margin-bottom:6px">${pct>=80?'Отлично!':pct>=50?'Неплохо!':'Есть над чем поработать'}</h2><div class="results-score" style="color:${c}">${quizScore}/${QUESTIONS.length}</div><p style="font-size:14px;color:#6b7280;margin-bottom:24px">правильных ответов (${pct}%)</p><div class="results-bar-track"><div class="results-bar-fill" style="width:${pct}%;background:${c}"></div></div><button class="btn-primary" style="width:auto;display:inline-flex;padding:12px 28px" onclick="restartQuiz()">Пройти заново</button><div class="share-box"><div style="font-size:13px;font-weight:700;margin-bottom:4px">Бросьте вызов друзьям!</div><div style="font-size:12px;color:#6b7280;margin-bottom:10px">Поделитесь результатом в Telegram</div><button style="padding:8px 20px;border-radius:6px;border:none;background:#0088cc;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✈️ Поделиться</button></div></div>`;
+    return;
+  }
+  const q = QUESTIONS[quizCurrent], answered = quizSelected !== null, sd = quizScore+'/'+(quizCurrent+(answered?1:0));
+  let stH = quizStreak>1?`<span class="badge" style="background:#ff6d00;color:#fff">🔥 ${quizStreak}</span>`:'';
+  let prgH = QUESTIONS.map((_,i)=>`<div class="progress-segment${i<quizCurrent?' done':i===quizCurrent?' current':''}"></div>`).join('');
+  let optH = q.opts.map((o,i)=>{let cls='quiz-option',mb='#f0f2f5',mc='#6b7280',mt=String.fromCharCode(65+i);if(answered){cls+=' answered';if(i===q.correct){cls+=' correct';mb='#2e7d32';mc='#fff';mt='✓';}else if(i===quizSelected){cls+=' wrong';mb='#e53935';mc='#fff';mt='✗';}else cls+=' dimmed';}return`<button class="${cls}" onclick="selectAnswer(${i})"><span class="option-marker" style="background:${mb};color:${mc}">${mt}</span>${o}</button>`;}).join('');
+  let exH = answered?`<div class="explanation"><div class="explanation-label">Пояснение</div><p>${q.expl}</p><button class="btn-primary" style="margin-top:10px" onclick="nextQuestion()">${quizCurrent<QUESTIONS.length-1?'Следующий вопрос →':'Результаты'}</button></div>`:'';
+  el.innerHTML = `<div class="section-header"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:11px;font-weight:700;color:#00AEEF;text-transform:uppercase;letter-spacing:0.08em">Ежедневная викторина</span><div style="display:flex;align-items:center;gap:8px">${stH}<span style="font-family:'PT Sans Caption',sans-serif;font-size:13px;font-weight:700;color:#00AEEF;background:#e6f7ff;padding:3px 10px;border-radius:6px">${sd}</span></div></div><div class="progress-bar">${prgH}</div><div style="font-size:11px;color:#9ca3af;text-align:right">${quizCurrent+1} из ${QUESTIONS.length}</div></div><div style="animation:fadeUp 0.4s ease"><div class="card" style="border-left:4px solid #e53935;margin-bottom:12px"><h3 style="font-size:16px;font-weight:700;line-height:1.45">${q.q}</h3></div><div style="display:flex;flex-direction:column;gap:8px">${optH}</div>${exH}</div>`;
+}
+
+function initMap() {
+  leafletMap = L.map('leafletMap',{center:[53.5,104.0],zoom:6,zoomControl:false,attributionControl:false});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(leafletMap);
+  L.control.zoom({position:'topright'}).addTo(leafletMap);
+  mapInitialized = true; renderMapMarkers();
+}
+function createMarkerIcon(color,hot,selected) {
+  const s=selected?22:16, b=selected?3:2.5;
+  const sh=selected?`box-shadow:0 0 0 4px ${color}40,0 2px 8px rgba(0,0,0,0.3)`:hot?`box-shadow:0 0 0 4px ${color}25,0 2px 6px rgba(0,0,0,0.3)`:`box-shadow:0 2px 6px rgba(0,0,0,0.3)`;
+  return L.divIcon({className:'',html:`<div style="width:${s}px;height:${s}px;border-radius:50%;background:${color};border:${b}px solid #fff;${sh};transition:all 0.2s"></div>`,iconSize:[s,s],iconAnchor:[s/2,s/2]});
+}
+function renderMapMarkers() {
+  if(!leafletMap)return;
+  mapMarkers.forEach(m=>leafletMap.removeLayer(m)); mapMarkers=[];
+  const f=mapFilter==="Все"?MAP_EVENTS:MAP_EVENTS.filter(e=>e.cat===mapFilter);
+  f.forEach(evt=>{
+    const c=CAT_COLORS[evt.cat]||'#00AEEF',sel=mapSelectedId===evt.id,icon=createMarkerIcon(c,evt.hot,sel);
+    const marker=L.marker([evt.lat,evt.lng],{icon}).addTo(leafletMap);
+    marker.bindPopup(`<div style="font-family:'PT Sans',sans-serif;min-width:140px"><div style="font-size:13px;font-weight:700;margin-bottom:3px">${evt.title}</div><div style="font-size:11px;color:#9ca3af;margin-bottom:5px">${evt.city} · ${evt.time}</div><span class="badge" style="background:${c}14;color:${c};font-size:10px;padding:2px 6px">${evt.cat}</span></div>`,{closeButton:false});
+    marker.on('click',()=>{mapSelectedId=sel?null:evt.id;renderMapMarkers();renderEventsList();});
+    if(sel)marker.openPopup();
+    mapMarkers.push(marker);
+  });
+}
+function renderMapFilters() {
+  const cats=["Все",...Object.keys(CAT_COLORS)];
+  document.getElementById('mapFilters').innerHTML=cats.map(cat=>{const a=mapFilter===cat,bg=a?(CAT_COLORS[cat]||'#00AEEF'):'#fff',c=a?'#fff':'#6b7280';return`<button class="filter-pill ${a?'active':''}" style="background:${bg};color:${c};${a?'border:none':''}" onclick="setMapFilter('${cat}')">${cat}</button>`;}).join('');
+}
+function setMapFilter(cat){mapFilter=cat;mapSelectedId=null;renderMapFilters();renderMapMarkers();renderEventsList();}
+function selectMapEvent(id){mapSelectedId=mapSelectedId===id?null:id;const e=MAP_EVENTS.find(e=>e.id===id);if(e&&mapSelectedId)leafletMap.setView([e.lat,e.lng],9,{animate:true});renderMapMarkers();renderEventsList();}
+function renderEventsList() {
+  const f=mapFilter==="Все"?MAP_EVENTS:MAP_EVENTS.filter(e=>e.cat===mapFilter);
+  document.getElementById('eventsList').innerHTML=f.map((evt,i)=>{const c=CAT_COLORS[evt.cat]||'#00AEEF',sel=mapSelectedId===evt.id;return`<button class="event-item ${sel?'selected':''}" style="${sel?`background:${c}08;border-color:${c}30;border-left-color:${c}`:''}; animation:fadeUp 0.3s ease ${i*0.04}s both" onclick="selectMapEvent(${evt.id})"><div class="dot" style="background:${c};${evt.hot?`box-shadow:0 0 6px ${c}50`:''}"></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">${evt.title}</div><div style="font-size:11px;color:#9ca3af">${evt.city} · ${evt.time}</div></div><span class="badge" style="background:${c}14;color:${c}">${evt.cat}</span></button>`;}).join('');
+}
+
+renderReports();
+</script>
+</body>
+</html>
